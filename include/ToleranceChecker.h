@@ -36,7 +36,7 @@ struct SignalConfig {
 // 信号信息结构
 struct SignalInfo {
     SignalConfig config;
-    SignalState currentState{SignalState::UNKNOWN};  // 初始状态为UNKNOWN
+    SignalState  currentState{SignalState::UNKNOWN};  // 初始状态为UNKNOWN
     std::chrono::steady_clock::time_point registrationTime;
     std::chrono::steady_clock::time_point warningStartTime;
     std::chrono::steady_clock::time_point faultStartTime;
@@ -87,5 +87,5 @@ private:
     
     std::atomic<bool> m_isMonitoring{false};
     std::thread m_monitoringThread;
-    int m_checkIntervalMs{100};
+    int m_checkIntervalMs{10};
 };

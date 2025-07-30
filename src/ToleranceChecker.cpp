@@ -96,13 +96,13 @@ void ToleranceChecker::monitoringLoop() {
     }
 }
 
-void ToleranceChecker::checkSignal(const std::string& signalId, SignalInfo& signalInfo) {
-    auto currentTime = std::chrono::steady_clock::now();
+void ToleranceChecker::checkSignal(const std::string& signalId, SignalInfo& sig) {
+    auto now = std::chrono::steady_clock::now();
     
     // 获取当前信号值
     double currentValue = 0.0;
     try {
-        currentValue = signalInfo.config.valueCallback(signalId);
+        currentValue = sig.config.valueCallback(signalId);
     } catch (const std::exception& e) {
         std::cerr << "获取信号 " << signalId << " 的值时发生错误: " << e.what() << std::endl;
         return;
@@ -110,56 +110,67 @@ void ToleranceChecker::checkSignal(const std::string& signalId, SignalInfo& sign
     
     // 检查tc等待期
     auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-        currentTime - signalInfo.registrationTime).count();
-    if (elapsedMs < signalInfo.config.tcMs) {
+        now - sig.registrationTime).count();
+    if (elapsedMs < sig.config.tcMs) {
         return;  // 仍在等待期
     }
     // 首次过等待期时输出日志
-    if (signalInfo.currentState == SignalState::UNKNOWN && elapsedMs >= signalInfo.config.tcMs) {
+    if (sig.currentState == SignalState::UNKNOWN && elapsedMs >= sig.config.tcMs) {
         std::cout << "信号 " << signalId << " tc等待期结束，开始监控" << std::endl;
     }
 
     // 计算偏差值（当前值与目标值的差的绝对值）
-    double deviation = std::abs(currentValue - signalInfo.config.targetValue);
+    double deviation = std::abs(currentValue - sig.config.targetValue);
     
     // // 1) 信号处于正常状态
-    // if (deviation <= signalInfo.config.warningThreshold) {
-    //     signalInfo.currentState = SignalState::NORMAL;
-    //     signalInfo.warningTimerActive = signalInfo.faultTimerActive = false;;
+    // if (deviation <= sig.config.warningThreshold) {
+    //     sig.currentState = SignalState::NORMAL;
+    //     sig.warningTimerActive = sig.faultTimerActive = false;
     //     return;
     // }
     
     // // 2) 信号处于警告状态
-    // if (deviation <= signalInfo.config.faultThreshold) {
-    //     signalInfo.currentState = SignalState::WARNING;
-    //     if (!signalInfo.warningTimerActive) {
-    //         signalInfo.warningTimerActive = true;
-    //         signalInfo.warningStartTime = currentTime;
+    // if (deviation <= sig.config.faultThreshold) {
+    //     sig.faultTimerActive = false;
+    //     if (!sig.warningTimerActive) {
+    //         sig.warningTimerActive = true;
+    //         sig.warningStartTime = now;
     //     }
-    //     signalInfo.faultTimerActive = false;
+    //     if ((now - sig.warningStartTime).count() >= sig.config.tcMs) {
+    //         if (sig.currentState != SignalState::WARNING && sig.config.warningCallback)
+    //             sig.config.warningCallback(signalId, currentValue);
+    //         sig.currentState = SignalState::WARNING;
+    //     }
     // }
+
     // // 3) 信号处于故障状态
     // else {
-    //     if (!signalInfo.faultTimerActive) {
-    //         signalInfo.faultStartTime = currentTime;
-    //         signalInfo.faultTimerActive = true;
+    //     if (!sig.faultTimerActive) {
+    //         sig.faultStartTime = now;
+    //         sig.faultTimerActive = true;
+    //     }
+    //     if ((now - sig.faultStartTime).count() >= sig.config.tcMs) {
+    //         if (sig.currentState != SignalState::FAULT && sig.config.faultCallback)
+    //             sig.config.faultCallback(signalId, currentValue);
+    //         sig.currentState = SignalState::FAULT;
     //     }
     // }
+
     // 确定目标状态
     SignalState targetState = SignalState::NORMAL;
-    if (deviation >= signalInfo.config.faultThreshold) {
+    if (deviation >= sig.config.faultThreshold) {
         targetState = SignalState::FAULT;
-    } else if (deviation >= signalInfo.config.warningThreshold) {
+    } else if (deviation >= sig.config.warningThreshold) {
         targetState = SignalState::WARNING;
     }
     
     // 处理状态变化
-    if (targetState != signalInfo.currentState) {
-        handleStateTransition(signalId, signalInfo, targetState, currentValue, deviation);
+    if (targetState != sig.currentState) {
+        handleStateTransition(signalId, sig, targetState, currentValue, deviation);
     }
     
     // 检查并触发回调
-    checkAndTriggerCallback(signalId, signalInfo, currentValue, currentTime);
+    checkAndTriggerCallback(signalId, sig, currentValue, now);
 }
 
 void ToleranceChecker::checkAndTriggerCallback(const std::string& signalId, SignalInfo& signalInfo,
@@ -173,7 +184,7 @@ void ToleranceChecker::checkAndTriggerCallback(const std::string& signalId, Sign
         
         if (elapsedMs >= signalInfo.config.tsMs) {
             timerActive = false;
-            std::cout << "信号 " << signalId << " 触发" << level << "回调，值: " << currentValue << std::endl;
+            // std::cout << "信号 " << signalId << " 触发" << level << "回调，值: " << currentValue << std::endl;
             if (callback) {
                 callback(signalId, currentValue);
             }
@@ -189,11 +200,11 @@ void ToleranceChecker::handleStateTransition(const std::string& signalId, Signal
     auto currentTime = std::chrono::steady_clock::now();
     
     // 输出状态变化信息
-    std::cout << "信号 " << signalId << " 状态变化: " << getStateName(signalInfo.currentState)
-              << " -> " << getStateName(newState) 
-              << " (当前值: " << currentValue 
-              << ", 目标值: " << signalInfo.config.targetValue 
-              << ", 偏差: " << deviation << ")" << std::endl;
+    // std::cout << "信号 " << signalId << " 状态变化: " << getStateName(signalInfo.currentState)
+    //           << " -> " << getStateName(newState) 
+    //           << " (当前值: " << currentValue 
+    //           << ", 目标值: " << signalInfo.config.targetValue 
+    //           << ", 偏差: " << deviation << ")" << std::endl;
     
     signalInfo.currentState = newState;
     
