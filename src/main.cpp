@@ -111,9 +111,6 @@ int main() {
     
     checker.registerSignal("pressure_sensor", pressureConfig);
     
-    // 开始监控
-    checker.startMonitoring(100);  // 每100ms检查一次
-    
     std::cout << std::endl;
     std::cout << "开始传感器数据模拟..." << std::endl;
     std::cout << "温度：目标值=40°C，警告容差=±20°C，故障容差=±40°C" << std::endl;

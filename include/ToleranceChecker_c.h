@@ -49,13 +49,6 @@ typedef struct {
 int tc_register_signal(const char* signal_id, const tc_signal_config_t* config);
 
 /**
- * 开始监控
- * @param check_interval_ms 检查间隔（毫秒），默认100ms
- * @return 成功返回TC_SUCCESS，失败返回错误码
- */
-int tc_start_monitoring(int check_interval_ms);
-
-/**
  * 停止监控
  * @return 成功返回TC_SUCCESS，失败返回错误码
  */

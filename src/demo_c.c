@@ -128,14 +128,6 @@ int main(void) {
         return 1;
     }
     
-    // 4. 开始监控
-    printf("\n[C Demo] 开始监控 (检查间隔: 100ms)...\n");
-    result = tc_start_monitoring(100);
-    if (result != TC_SUCCESS) {
-        printf("[C Demo] 开始监控失败，错误码: %d\n", result);
-        return 1;
-    }
-    
     // 检查监控状态
     if (tc_is_monitoring()) {
         printf("[C Demo] 监控系统已启动\n");
