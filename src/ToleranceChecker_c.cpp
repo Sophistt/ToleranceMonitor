@@ -1,33 +1,27 @@
 #include "ToleranceChecker_c.h"
 #include "ToleranceChecker.h"
-#include <unordered_map>
-#include <memory>
 #include <string>
 #include <exception>
 
-// 回调函数包装器映射，用于管理回调函数的生命周期
-static std::unordered_map<std::string, std::shared_ptr<SignalConfig>> g_signal_configs;
-static std::mutex g_callback_mutex;
-
 // 将 C 回调函数转换为 C++ std::function
-static WarningCallback wrap_warning_callback(tc_warning_callback_t c_callback) {
+static WarningCallback wrap_warning_callback(tc_warning_callback_t c_callback, void* context) {
     if (!c_callback) return nullptr;
-    return [c_callback](const std::string& signalId, double value) {
-        c_callback(signalId.c_str(), value);
+    return [c_callback, context](const std::string& signalId, double value) {
+        c_callback(signalId.c_str(), value, context);
     };
 }
 
-static FaultCallback wrap_fault_callback(tc_fault_callback_t c_callback) {
+static FaultCallback wrap_fault_callback(tc_fault_callback_t c_callback, void* context) {
     if (!c_callback) return nullptr;
-    return [c_callback](const std::string& signalId, double value) {
-        c_callback(signalId.c_str(), value);
+    return [c_callback, context](const std::string& signalId, double value) {
+        c_callback(signalId.c_str(), value, context);
     };
 }
 
-static ValueCallback wrap_value_callback(tc_value_callback_t c_callback) {
+static ValueCallback wrap_value_callback(tc_value_callback_t c_callback, void* context) {
     if (!c_callback) return nullptr;
-    return [c_callback](const std::string& signalId) -> double {
-        return c_callback(signalId.c_str());
+    return [c_callback, context](const std::string& signalId) -> double {
+        return c_callback(signalId.c_str(), context);
     };
 }
 
@@ -61,26 +55,21 @@ int tc_register_signal(const char* signal_id, const tc_signal_config_t* config) 
     }
     
     try {
-        std::lock_guard<std::mutex> lock(g_callback_mutex);
-        
         // 创建 C++ 配置
-        auto cpp_config = std::make_shared<SignalConfig>();
-        cpp_config->targetValue = config->target_value;
-        cpp_config->warningThreshold = config->warning_threshold;
-        cpp_config->faultThreshold = config->fault_threshold;
-        cpp_config->warningCallback = wrap_warning_callback(config->warning_callback);
-        cpp_config->faultCallback = wrap_fault_callback(config->fault_callback);
-        cpp_config->valueCallback = wrap_value_callback(config->value_callback);
-        cpp_config->tcMs = config->tc_ms;
-        cpp_config->tsMs = config->ts_ms;
-        
-        // 保存配置以管理生命周期
-        std::string signal_key(signal_id);
-        g_signal_configs[signal_key] = cpp_config;
+        SignalConfig cpp_config;
+        cpp_config.targetValue = config->target_value;
+        cpp_config.warningThreshold = config->warning_threshold;
+        cpp_config.faultThreshold = config->fault_threshold;
+        cpp_config.warningCallback = wrap_warning_callback(config->warning_callback, config->context);
+        cpp_config.faultCallback = wrap_fault_callback(config->fault_callback, config->context);
+        cpp_config.valueCallback = wrap_value_callback(config->value_callback, config->context);
+        cpp_config.tcMs = config->tc_ms;
+        cpp_config.tsMs = config->ts_ms;
         
         // 注册信号
+        std::string signal_key(signal_id);
         auto& checker = ToleranceChecker::getInstance();
-        bool success = checker.registerSignal(signal_key, *cpp_config);
+        bool success = checker.registerSignal(signal_key, cpp_config);
         
         return success ? TC_SUCCESS : TC_ERROR_EXISTS;
         
@@ -116,14 +105,9 @@ int tc_remove_signal(const char* signal_id) {
     }
     
     try {
-        std::lock_guard<std::mutex> lock(g_callback_mutex);
-        
         std::string signal_key(signal_id);
         auto& checker = ToleranceChecker::getInstance();
         checker.removeSignal(signal_key);
-        
-        // 清理保存的配置
-        g_signal_configs.erase(signal_key);
         
         return TC_SUCCESS;
         

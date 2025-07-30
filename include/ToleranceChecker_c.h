@@ -14,9 +14,9 @@ typedef enum {
 } tc_signal_state_t;
 
 // 回调函数类型定义
-typedef void (*tc_warning_callback_t)(const char* signal_id, double value);
-typedef void (*tc_fault_callback_t)(const char* signal_id, double value);
-typedef double (*tc_value_callback_t)(const char* signal_id);
+typedef void (*tc_warning_callback_t)(const char* signal_id, double value, void* ctx);
+typedef void (*tc_fault_callback_t)(const char* signal_id, double value, void* ctx);
+typedef double (*tc_value_callback_t)(const char* signal_id, void* ctx);
 
 // 信号配置结构
 typedef struct {
@@ -26,9 +26,19 @@ typedef struct {
     tc_warning_callback_t warning_callback;  // 警告回调函数
     tc_fault_callback_t fault_callback;      // 故障回调函数
     tc_value_callback_t value_callback;      // 获取信号值的回调函数
+    void* context;                      // 用户上下文指针（调用者负责生命周期管理）
     int tc_ms;                          // 等待时间（毫秒）
     int ts_ms;                          // 持续时间（毫秒）
 } tc_signal_config_t;
+
+/**
+ * 重要说明：context 生命周期管理
+ * 
+ * context 指针由调用者负责管理，调用者必须确保：
+ * 1. context 指向的内存在信号监控期间保持有效
+ * 2. 在调用 tc_remove_signal() 或程序结束前，不能释放 context 指向的内存
+ * 3. 这是标准的 C 接口设计模式，遵循"谁分配谁释放"的原则
+ */
 
 // 错误码定义
 #define TC_SUCCESS           0    // 成功
